@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/splash_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/property_list_screen.dart';
@@ -12,6 +13,7 @@ import '../screens/landlord_submission_screen.dart';
 import '../screens/landlord_photos_screen.dart';
 import '../screens/landlord_management_screen.dart';
 import '../screens/contact_screen.dart';
+import '../screens/admin_login_screen.dart';
 import '../admin/admin_dashboard.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -88,8 +90,19 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const ContactScreen(),
     ),
     GoRoute(
+      path: '/admin/login',
+      name: 'adminLogin',
+      builder: (context, state) => const AdminLoginScreen(),
+    ),
+    GoRoute(
       path: '/admin',
       name: 'admin',
+      redirect: (context, state) {
+        if (FirebaseAuth.instance.currentUser == null) {
+          return '/admin/login';
+        }
+        return null;
+      },
       builder: (context, state) => const AdminDashboard(),
     ),
   ],

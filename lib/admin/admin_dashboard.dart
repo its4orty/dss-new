@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
 import '../services/firestore_service.dart';
 import '../models/property.dart';
@@ -949,10 +951,11 @@ class _SettingsTab extends StatelessWidget {
                 actions: [
                   TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.pop(ctx);
-                      if (context.mounted) {
-                        Navigator.of(context).popUntil((route) => route.isFirst);
+                      await FirebaseAuth.instance.signOut();
+                      if (ctx.mounted) {
+                        context.go('/admin/login');
                       }
                     },
                     style: ElevatedButton.styleFrom(
