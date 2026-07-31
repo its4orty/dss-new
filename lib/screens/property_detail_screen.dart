@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -191,8 +193,20 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                           setState(() => _currentImageIndex = index);
                         },
                         itemBuilder: (context, index) {
+                          final image = property.images[index];
+                          if (image.startsWith('data:')) {
+                            try {
+                              return Image.memory(
+                                base64Decode(image.substring(image.indexOf(',') + 1)),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined, size: 64),
+                              );
+                            } catch (_) {
+                              return const Icon(Icons.image_not_supported_outlined, size: 64);
+                            }
+                          }
                           return CachedNetworkImage(
-                            imageUrl: property.images[index],
+                            imageUrl: image,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Container(
                               color: AppTheme.primaryNavy.withOpacity(0.08),
