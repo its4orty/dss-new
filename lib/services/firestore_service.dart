@@ -5,10 +5,7 @@ import '../models/landlord.dart';
 import '../models/enquiry.dart';
 
 class FirestoreService {
-  final FirebaseFirestore db;
-
-  FirestoreService({FirebaseFirestore? firestore})
-      : db = firestore ?? FirebaseFirestore.instance;
+  FirebaseFirestore get db => FirebaseFirestore.instance;
 
   // ──────────────────────────────────────────────
   // Properties
