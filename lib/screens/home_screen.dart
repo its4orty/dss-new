@@ -14,7 +14,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final FirestoreService _firestoreService = FirestoreService();
+  final _waitlistFormKey = GlobalKey<FormState>();
+  final _waitlistEmailController = TextEditingController();
   int _currentIndex = 0;
+  bool _isSubmittingWaitlist = false;
+  bool _waitlistSubmitted = false;
 
   late Future<_HomeData> _homeDataFuture;
 
@@ -35,10 +39,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  @override
+  void dispose() {
+    _waitlistEmailController.dispose();
+    super.dispose();
+  }
+
   void _refreshData() {
     setState(() {
       _homeDataFuture = _loadHomeData();
     });
+  }
+
+  Future<void> _submitWaitlist() async {
+    if (!_waitlistFormKey.currentState!.validate()) return;
+    setState(() => _isSubmittingWaitlist = true);
+    try {
+      await _firestoreService.submitToWaitlist(_waitlistEmailController.text);
+      if (!mounted) return;
+      setState(() {
+        _isSubmittingWaitlist = false;
+        _waitlistSubmitted = true;
+      });
+      _waitlistEmailController.clear();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSubmittingWaitlist = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to join the mailing list. Please try again.'),
+          backgroundColor: AppTheme.errorRed,
+        ),
+      );
+    }
   }
 
   void _showWaitlistDialog() {
@@ -138,20 +171,22 @@ class _HomeScreenState extends State<HomeScreen> {
               // ── Hero Section ──
               _buildHeroSection(),
 
-              const SizedBox(height: 24),
+              // ── Landing page content ──
+              _buildLandingStats(),
 
-              // ── Quick Actions ──
+              const SizedBox(height: 24),
+              _buildFeaturesGrid(),
+
+              const SizedBox(height: 28),
+              _buildWaitlistSection(),
+
+              const SizedBox(height: 32),
+
+              // ── Secondary content ──
               _buildQuickActions(),
 
               const SizedBox(height: 32),
-
-              // ── Featured Properties ──
               _buildFeaturedSection(),
-
-              const SizedBox(height: 32),
-
-              // ── Stats Bar ──
-              _buildStatsBar(),
 
               const SizedBox(height: 32),
 
@@ -597,8 +632,574 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Stats Bar
+  // Landing page content
   // ═══════════════════════════════════════════════════════════════
+  Widget _buildLandingStats() {
+    return Container(
+      color: AppTheme.primaryNavy,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      child: const Row(
+        children: [
+          Expanded(child: _LandingStat(value: '10+', label: 'Properties')),
+          _LandingStatDivider(),
+          Expanded(child: _LandingStat(value: '5+', label: 'Cities')),
+          _LandingStatDivider(),
+          Expanded(child: _LandingStat(value: '24/7', label: 'Access')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeaturesGrid() {
+    const features = [
+      ('🔍', 'Browse Properties', 'Search listings across the UK with detailed info and photos'),
+      ('📝', 'Apply Online', 'Submit applications in minutes, no paperwork needed'),
+      ('🏢', 'For Landlords', 'List properties, screen tenants, manage enquiries'),
+      ('📞', 'Direct Contact', 'Call, WhatsApp or email — we\'re here to help'),
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Why DSS Lets?', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: features.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.92,
+            ),
+            itemBuilder: (context, index) {
+              final feature = features[index];
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryNavy,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.secondaryGold.withOpacity(0.28)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(feature.$1, style: const TextStyle(fontSize: 27)),
+                    const SizedBox(height: 10),
+                    Text(feature.$2, style: const TextStyle(color: AppTheme.accentWhite, fontSize: 15, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Expanded(child: Text(feature.$3, style: TextStyle(color: AppTheme.accentWhite.withOpacity(0.75), fontSize: 12, height: 1.3))),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWaitlistSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.accentWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.primaryNavy.withOpacity(0.12)),
+      ),
+      child: Form(
+        key: _waitlistFormKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Stay Updated', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 6),
+            const Text('New properties added weekly. Join our mailing list.'),
+            const SizedBox(height: 16),
+            if (_waitlistSubmitted)
+              const Row(children: [
+                Icon(Icons.check_circle, color: AppTheme.successGreen),
+                SizedBox(width: 8),
+                Expanded(child: Text('Thanks! You\'re on the list.', style: TextStyle(color: AppTheme.successGreen, fontWeight: FontWeight.w600))),
+              ])
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _waitlistEmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.done,
+                      decoration: const InputDecoration(hintText: 'Email address'),
+                      validator: (value) {
+                        final email = value?.trim() ?? '';
+                        if (email.isEmpty) return 'Enter your email';
+                        if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                          return 'Enter a valid email';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _isSubmittingWaitlist ? null : _submitWaitlist,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.successGreen,
+                        foregroundColor: AppTheme.accentWhite,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                      child: _isSubmittingWaitlist
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentWhite))
+                          : const Text('Notify Me'),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Existing analytics stats helper retained for compatibility.
+  Widget _buildStatsBar() {
+    return FutureBuilder<_HomeData>(
+      future: _homeDataFuture,
+      builder: (context, snapshot) {
+        // Show placeholder stats while loading or on error
+        final stats = snapshot.hasData
+            ? snapshot.data!.stats
+            : <String, int>{
+                'properties': 0,
+                'tenants': 0,
+                'landlords': 0,
+                'enquiries': 0,
+              };
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+          decoration: BoxDecoration(
+            color: AppTheme.accentWhite,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _StatItem(
+                icon: Icons.home_work_rounded,
+                value: '${stats['properties'] ?? 0}',
+                label: 'Properties',
+                color: AppTheme.primaryNavy,
+              ),
+              _StatItem(
+                icon: Icons.check_circle_outline_rounded,
+                value: '${stats['tenants'] ?? 0}',
+                label: 'Available',
+                color: AppTheme.successGreen,
+              ),
+              _StatItem(
+                icon: Icons.description_outlined,
+                value: '${stats['enquiries'] ?? 0}',
+                label: 'Applications',
+                color: AppTheme.secondaryGold,
+              ),
+              _StatItem(
+                icon: Icons.list_alt_rounded,
+                value: '${stats['landlords'] ?? 0}',
+                label: 'Landlords',
+                color: const Color(0xFF6C63FF),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Landlord CTA
+  // ═══════════════════════════════════════════════════════════════
+  Widget _buildLandlordCta() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppTheme.secondaryGold, Color(0xFFE6C84A)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Are You a Landlord?',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryNavy,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'List your property with DSS Lets and get guaranteed rent',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.primaryNavy,
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => context.go('/landlord/submit'),
+            icon: const Icon(Icons.add_business_rounded, size: 18),
+            label: const Text('List Your Property'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.primaryNavy,
+              side: const BorderSide(
+                color: AppTheme.primaryNavy,
+                width: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+class _LandingStat extends StatelessWidget {
+  final String value;
+  final String label;
+  const _LandingStat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Text(value, style: const TextStyle(color: AppTheme.secondaryGold, fontSize: 22, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 3),
+      Text(label, style: TextStyle(color: AppTheme.accentWhite.withOpacity(0.72), fontSize: 12)),
+    ],
+  );
+}
+
+class _LandingStatDivider extends StatelessWidget {
+  const _LandingStatDivider();
+  @override
+  Widget build(BuildContext context) => Container(height: 34, width: 1, color: AppTheme.accentWhite.withOpacity(0.25));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Quick Action Card
+// ═══════════════════════════════════════════════════════════════
+class _QuickActionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color iconColor;
+  final Color labelColor;
+  final VoidCallback onTap;
+
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.iconColor = AppTheme.accentWhite,
+    this.labelColor = AppTheme.accentWhite,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: iconColor, size: 32),
+              const SizedBox(height: 16),
+              Text(
+                label,
+                style: TextStyle(
+                  color: labelColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Featured Property Card
+// ═══════════════════════════════════════════════════════════════
+class _FeaturedPropertyCard extends StatelessWidget {
+  final Property property;
+
+  const _FeaturedPropertyCard({required this.property});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage =
+        property.images.isNotEmpty && property.images.first.isNotEmpty;
+
+    return GestureDetector(
+      onTap: () => context.go('/properties/${property.id}'),
+      child: Container(
+        width: 200,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.accentWhite,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Property image
+            ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
+              child: hasImage
+                  ? CachedNetworkImage(
+                      imageUrl: property.images.first,
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        height: 120,
+                        color: AppTheme.primaryNavy.withOpacity(0.08),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppTheme.primaryNavy,
+                            ),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        height: 120,
+                        color: AppTheme.primaryNavy.withOpacity(0.08),
+                        child: const Icon(
+                          Icons.home_rounded,
+                          size: 48,
+                          color: AppTheme.primaryNavy,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      height: 120,
+                      color: AppTheme.primaryNavy.withOpacity(0.08),
+                      child: const Icon(
+                        Icons.home_rounded,
+                        size: 48,
+                        color: AppTheme.primaryNavy,
+                      ),
+                    ),
+            ),
+            // Property details
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    property.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppTheme.textDark,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined,
+                          size: 12, color: AppTheme.textMedium),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          property.postcode.isNotEmpty
+                              ? property.postcode
+                              : property.address,
+                          style: const TextStyle(
+                            color: AppTheme.textMedium,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        '£${property.rent.toStringAsFixed(0)} PCM',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: AppTheme.primaryNavy,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(Icons.bed_outlined,
+                          size: 14, color: AppTheme.textMedium),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${property.bedrooms}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textMedium,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.bathtub_outlined,
+                          size: 14, color: AppTheme.textMedium),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${property.bathrooms}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Stat Item
+// ═══════════════════════════════════════════════════════════════
+class _StatItem extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  const _StatItem({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 22, color: color),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppTheme.textMedium,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Home Data container
+// ═══════════════════════════════════════════════════════════════
+class _HomeData {
+  final List<Property> properties;
+  final Map<String, int> stats;
+
+  const _HomeData({required this.properties, required this.stats});
+}
+).hasMatch(email)) return 'Enter a valid email';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _isSubmittingWaitlist ? null : _submitWaitlist,
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.successGreen, foregroundColor: AppTheme.accentWhite, padding: const EdgeInsets.symmetric(horizontal: 16)),
+                      child: _isSubmittingWaitlist ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentWhite)) : const Text('Notify Me'),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Existing analytics stats helper retained for compatibility.
   Widget _buildStatsBar() {
     return FutureBuilder<_HomeData>(
       future: _homeDataFuture,
