@@ -80,51 +80,6 @@ class _TenantApplicationsScreenState extends State<TenantApplicationsScreen> {
     }
   }
 
-  // ── Status helpers ────────────────────────────────────────
-
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'new':
-        return const Color(0xFF2196F3); // blue
-      case 'contacted':
-        return AppTheme.secondaryGold;
-      case 'viewed':
-        return AppTheme.successGreen;
-      case 'accepted':
-        return AppTheme.successGreen;
-      case 'rejected':
-        return AppTheme.errorRed;
-      default:
-        return AppTheme.textMedium;
-    }
-  }
-
-  String _statusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case 'new':
-        return 'New';
-      case 'contacted':
-        return 'Contacted';
-      case 'viewed':
-        return 'Viewed';
-      case 'accepted':
-        return 'Accepted';
-      case 'rejected':
-        return 'Rejected';
-      default:
-        return status;
-    }
-  }
-
-  String _formatDate(DateTime? dt) {
-    if (dt == null) return '';
-    final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-
   // ── Build ──────────────────────────────────────────────────
 
   @override
