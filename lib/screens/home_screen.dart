@@ -158,7 +158,30 @@ class _HomeScreenState extends State<HomeScreen> {
               // ── Landlord CTA Banner ──
               _buildLandlordCta(),
 
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
+
+              // ── Admin Access (subtle, owner-only) ──
+              Center(
+                child: TextButton(
+                  onPressed: () => context.go('/admin'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.textMedium.withOpacity(0.4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                  ),
+                  child: const Text(
+                    'Admin',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 32),
             ],
           ),
         ),
