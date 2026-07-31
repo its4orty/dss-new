@@ -573,20 +573,3 @@ class _PropertyImage extends StatelessWidget {
     return Image.network(source, height: 180, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppTheme.primaryNavy.withOpacity(0.08), child: const Icon(Icons.image_not_supported_outlined)));
   }
 }
-
-class _PropertyImage extends StatelessWidget {
-  final String source;
-  const _PropertyImage({required this.source});
-  @override
-  Widget build(BuildContext context) {
-    if (source.startsWith('data:')) {
-      try {
-        return Image.memory(base64Decode(source.substring(source.indexOf(',') + 1)), height: 180, width: double.infinity, fit: BoxFit.cover);
-      } catch (_) {
-        return const SizedBox(height: 180, child: Icon(Icons.image_not_supported_outlined));
-      }
-    }
-    return Image.network(source, height: 180, width: double.infinity, fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(color: AppTheme.primaryNavy.withOpacity(0.08), child: const Icon(Icons.image_not_supported_outlined)));
-  }
-}
