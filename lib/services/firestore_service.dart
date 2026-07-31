@@ -88,6 +88,16 @@ class FirestoreService {
     }
   }
 
+  Future<void> updatePropertyImages(String id, List<String> imagePaths) async {
+    try {
+      await db.collection('properties').doc(id).update({
+        'images': imagePaths,
+      });
+    } catch (e) {
+      throw Exception('Failed to update property images: $e');
+    }
+  }
+
   Future<void> deleteProperty(String id) async {
     try {
       await db.collection('properties').doc(id).delete();
@@ -147,6 +157,32 @@ class FirestoreService {
       return Landlord.fromMap(doc.data()!, doc.id);
     } catch (e) {
       throw Exception('Failed to fetch landlord: $e');
+    }
+  }
+
+  Future<void> submitManagementRequest({
+    required String propertyAddress,
+    required int numberOfProperties,
+    required String managementType,
+    required String additionalNotes,
+    required String contactName,
+    required String contactPhone,
+    required String contactEmail,
+  }) async {
+    try {
+      await db.collection('management_requests').add({
+        'propertyAddress': propertyAddress,
+        'numberOfProperties': numberOfProperties,
+        'managementType': managementType,
+        'additionalNotes': additionalNotes,
+        'contactName': contactName,
+        'contactPhone': contactPhone,
+        'contactEmail': contactEmail,
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'new',
+      });
+    } catch (e) {
+      throw Exception('Failed to submit management request: $e');
     }
   }
 

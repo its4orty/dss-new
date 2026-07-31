@@ -72,7 +72,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/landlord/photos',
       name: 'landlordPhotos',
-      builder: (context, state) => const LandlordPhotosScreen(),
+      builder: (context, state) {
+        final propertyId = state.extra as String? ?? '';
+        return LandlordPhotosScreen(propertyId: propertyId);
+      },
     ),
     GoRoute(
       path: '/landlord/management',
