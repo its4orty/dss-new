@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
+import '../models/tenant.dart';
+import '../services/firestore_service.dart';
+import '../services/tenant_session.dart';
 
 class TenantRegistrationScreen extends StatefulWidget {
   const TenantRegistrationScreen({super.key});
@@ -16,8 +19,12 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _preferredAreaController = TextEditingController();
+
+  final FirestoreService _firestoreService = FirestoreService();
+
   String _benefitType = 'Housing Benefit';
   DateTime? _moveDate;
+  bool _isSubmitting = false;
 
   final List<String> _benefitTypes = [
     'Housing Benefit',
@@ -36,50 +43,99 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
     super.dispose();
   }
 
+  // ── Date Picker ────────────────────────────────────────────
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
       initialDate: _moveDate ?? DateTime.now().add(const Duration(days: 30)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppTheme.secondaryGold,
+              onPrimary: AppTheme.primaryNavy,
+              surface: AppTheme.accentWhite,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() => _moveDate = picked);
     }
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
+  // ── Submit ─────────────────────────────────────────────────
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final tenant = Tenant(
+        fullname: _fullnameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        email: _emailController.text.trim(),
+        preferredArea: _preferredAreaController.text.trim(),
+        benefitType: _benefitType,
+        moveDate: _moveDate,
+      );
+
+      final tenantId = await _firestoreService.registerTenant(tenant);
+
+      // Persist the tenant ID locally so saved/applications screens
+      // know which tenant is active.
+      await TenantSession.setTenantId(tenantId);
+
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Registration submitted! (placeholder)'),
+          content: Text('Registration successful!'),
           backgroundColor: AppTheme.successGreen,
         ),
       );
+
+      // Navigate to saved properties screen
+      context.go('/tenant/saved');
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Registration failed: ${e.toString()}'),
+          backgroundColor: AppTheme.errorRed,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
+
+  // ── Build ──────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tenant Registration'),
-        actions: [
-          TextButton(
-            onPressed: () => context.go('/tenant/saved'),
-            child: const Text(
-              'Saved',
-              style: TextStyle(color: AppTheme.accentWhite),
-            ),
-          ),
-          TextButton(
-            onPressed: () => context.go('/tenant/applications'),
-            child: const Text(
-              'Applications',
-              style: TextStyle(color: AppTheme.accentWhite),
-            ),
-          ),
-        ],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+        ),
+        title: const Text('Register as Tenant'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -88,13 +144,18 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header
+              Icon(Icons.person_add_alt_1,
+                  size: 48, color: AppTheme.secondaryGold),
+              const SizedBox(height: 12),
               Text(
                 'Register as a Tenant',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 8),
               Text(
-                'Fill in your details to register interest in DSS-friendly properties',
+                'Fill in your details to register interest '
+                'in DSS-friendly properties',
                 style: TextStyle(fontSize: 14, color: AppTheme.textMedium),
               ),
               const SizedBox(height: 24),
@@ -107,8 +168,11 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
                   hintText: 'Enter your full name',
                   prefixIcon: Icon(Icons.person),
                 ),
+                textCapitalization: TextCapitalization.words,
                 validator: (v) =>
-                    v == null || v.isEmpty ? 'Please enter your name' : null,
+                    (v == null || v.trim().isEmpty)
+                        ? 'Please enter your full name'
+                        : null,
               ),
               const SizedBox(height: 16),
 
@@ -121,8 +185,16 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
                   prefixIcon: Icon(Icons.phone),
                 ),
                 keyboardType: TextInputType.phone,
-                validator: (v) =>
-                    v == null || v.isEmpty ? 'Please enter your phone' : null,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Please enter your phone number';
+                  }
+                  final digits = v.replaceAll(RegExp(r'\D'), '');
+                  if (digits.length < 10) {
+                    return 'Phone number must be at least 10 digits';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -136,8 +208,15 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
                 ),
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Please enter your email';
-                  if (!v.contains('@')) return 'Enter a valid email';
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Please enter your email';
+                  }
+                  final emailRegex = RegExp(
+                    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                  );
+                  if (!emailRegex.hasMatch(v.trim())) {
+                    return 'Enter a valid email address';
+                  }
                   return null;
                 },
               ),
@@ -148,12 +227,14 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
                 controller: _preferredAreaController,
                 decoration: const InputDecoration(
                   labelText: 'Preferred Area',
-                  hintText: 'e.g., Manchester, Birmingham',
+                  hintText: 'e.g., Bournemouth, Poole',
                   prefixIcon: Icon(Icons.location_on),
                 ),
-                validator: (v) => v == null || v.isEmpty
-                    ? 'Please enter a preferred area'
-                    : null,
+                textCapitalization: TextCapitalization.words,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty)
+                        ? 'Please enter a preferred area'
+                        : null,
               ),
               const SizedBox(height: 16),
 
@@ -167,13 +248,15 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
                 items: _benefitTypes.map((type) {
                   return DropdownMenuItem(value: type, child: Text(type));
                 }).toList(),
-                onChanged: (v) => setState(() => _benefitType = v!),
+                onChanged: (v) {
+                  if (v != null) setState(() => _benefitType = v);
+                },
               ),
               const SizedBox(height: 16),
 
               // Move Date
               InkWell(
-                onTap: _pickDate,
+                onTap: _isSubmitting ? null : _pickDate,
                 child: InputDecorator(
                   decoration: const InputDecoration(
                     labelText: 'Expected Move Date',
@@ -181,9 +264,12 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
                   ),
                   child: Text(
                     _moveDate != null
-                        ? '${_moveDate!.day}/${_moveDate!.month}/${_moveDate!.year}'
+                        ? '${_moveDate!.day.toString().padLeft(2, '0')}/'
+                            '${_moveDate!.month.toString().padLeft(2, '0')}/'
+                            '${_moveDate!.year}'
                         : 'Tap to select date',
                     style: TextStyle(
+                      fontSize: 16,
                       color: _moveDate != null
                           ? AppTheme.textDark
                           : AppTheme.textMedium,
@@ -193,13 +279,24 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Submit
+              // Submit Button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _submit,
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Register'),
+                  onPressed: _isSubmitting ? null : _submit,
+                  icon: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppTheme.primaryNavy,
+                          ),
+                        )
+                      : const Icon(Icons.person_add),
+                  label: Text(
+                    _isSubmitting ? 'Registering…' : 'Register',
+                  ),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
