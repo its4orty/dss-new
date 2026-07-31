@@ -106,6 +106,16 @@ class FirestoreService {
     }
   }
 
+  Future<void> togglePropertyAvailability(String id, bool available) async {
+    try {
+      await db.collection('properties').doc(id).update({
+        'available': available,
+      });
+    } catch (e) {
+      throw Exception('Failed to update property availability: $e');
+    }
+  }
+
   // ──────────────────────────────────────────────
   // Tenants
   // ──────────────────────────────────────────────
@@ -157,6 +167,17 @@ class FirestoreService {
       return Landlord.fromMap(doc.data()!, doc.id);
     } catch (e) {
       throw Exception('Failed to fetch landlord: $e');
+    }
+  }
+
+  Future<List<Landlord>> getAllLandlords() async {
+    try {
+      final snapshot = await db.collection('landlords').get();
+      return snapshot.docs
+          .map((doc) => Landlord.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch landlords: $e');
     }
   }
 
@@ -227,11 +248,49 @@ class FirestoreService {
     }
   }
 
+  Future<List<Enquiry>> getAllEnquiries() async {
+    try {
+      final snapshot = await db
+          .collection('enquiries')
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snapshot.docs
+          .map((doc) => Enquiry.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch all enquiries: $e');
+    }
+  }
+
   Future<void> updateEnquiryStatus(String id, String status) async {
     try {
       await db.collection('enquiries').doc(id).update({'status': status});
     } catch (e) {
       throw Exception('Failed to update enquiry status: $e');
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // Contact Messages
+  // ──────────────────────────────────────────────
+
+  Future<void> submitContactMessage({
+    required String name,
+    required String email,
+    required String phone,
+    required String message,
+  }) async {
+    try {
+      await db.collection('contact_messages').add({
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'message': message,
+        'createdAt': FieldValue.serverTimestamp(),
+        'read': false,
+      });
+    } catch (e) {
+      throw Exception('Failed to submit contact message: $e');
     }
   }
 
@@ -257,14 +316,37 @@ class FirestoreService {
   Future<Map<String, int>> getDashboardStats() async {
     try {
       final propsSnapshot = await db.collection('properties').get();
-      final tenantsSnapshot = await db.collection('tenants').get();
-      final landlordsSnapshot = await db.collection('landlords').get();
       final enquiriesSnapshot = await db.collection('enquiries').get();
+      final landlordsSnapshot = await db.collection('landlords').get();
+      final tenantsSnapshot = await db.collection('tenants').get();
+
+      final totalProperties = propsSnapshot.docs.length;
+      final availableProperties = propsSnapshot.docs
+          .where((d) => d.data()['available'] == true)
+          .length;
+      final newApplications = enquiriesSnapshot.docs
+          .where((d) => d.data()['status'] == 'new')
+          .length;
+      final waitingListCount = tenantsSnapshot.docs.length;
+      final newLandlords = landlordsSnapshot.docs.length;
+
+      // Monthly leads: enquiries created in the last 30 days
+      final now = DateTime.now();
+      final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+      final monthlyLeads = enquiriesSnapshot.docs.where((d) {
+        final data = d.data();
+        if (data['createdAt'] == null) return false;
+        final createdAt = (data['createdAt'] as dynamic).toDate() as DateTime;
+        return createdAt.isAfter(thirtyDaysAgo);
+      }).length;
+
       return {
-        'properties': propsSnapshot.docs.length,
-        'tenants': tenantsSnapshot.docs.length,
-        'landlords': landlordsSnapshot.docs.length,
-        'enquiries': enquiriesSnapshot.docs.length,
+        'totalProperties': totalProperties,
+        'availableProperties': availableProperties,
+        'newApplications': newApplications,
+        'waitingListCount': waitingListCount,
+        'newLandlords': newLandlords,
+        'monthlyLeads': monthlyLeads,
       };
     } catch (e) {
       throw Exception('Failed to fetch dashboard stats: $e');
