@@ -72,7 +72,15 @@ class _AdminEditPropertyScreenState extends State<AdminEditPropertyScreen> {
         DropdownButtonFormField<String>(value:_furnished, decoration:const InputDecoration(labelText:'Furnished Status',border:OutlineInputBorder(),filled:true), items:_furnishedOptions.map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(), onChanged:(v)=>setState(()=>_furnished=v!)),
         SwitchListTile(contentPadding:EdgeInsets.zero,title:const Text('Available'),value:_available, onChanged:(v)=>setState(()=>_available=v)),
         const SizedBox(height:12), const Text('Image URLs',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)), const SizedBox(height:6),
-        ..._images.asMap().entries.map((e)=>ListTile(contentPadding:EdgeInsets.zero, title:Text(e.value,maxLines:1,overflow:TextOverflow.ellipsis), leading:const Icon(Icons.link), trailing:IconButton(icon:const Icon(Icons.delete_outline,color:AppTheme.errorRed),onPressed:()=>setState(()=>_images.removeAt(e.key)))),
+        ..._images.asMap().entries.map((e) => ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(e.value, maxLines: 1, overflow: TextOverflow.ellipsis),
+          leading: const Icon(Icons.link),
+          trailing: IconButton(
+            icon: const Icon(Icons.delete_outline, color: AppTheme.errorRed),
+            onPressed: () => setState(() => _images.removeAt(e.key)),
+          ),
+        )),
         Row(children:[Expanded(child:TextField(controller:_imageUrl, decoration:const InputDecoration(labelText:'Paste image URL',border:OutlineInputBorder(),filled:true),keyboardType:TextInputType.url)), const SizedBox(width:8), IconButton(icon:const Icon(Icons.add_circle,color:AppTheme.primaryNavy,size:32),onPressed:(){final u=_imageUrl.text.trim();if(u.isNotEmpty){setState(()=>_images.add(u));_imageUrl.clear();}})]),
         const SizedBox(height:24), SizedBox(height:50, child:ElevatedButton(onPressed:_loading?null:_save, child:_loading?const SizedBox(width:22,height:22,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)):Text(widget.propertyId==null?'Create Property':'Save Changes')))
       ])));
