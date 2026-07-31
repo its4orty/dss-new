@@ -442,22 +442,24 @@ class _PropertiesTabState extends State<_PropertiesTab> {
     if (_error != null) {
       return _buildErrorState(_error!, _load);
     }
-    if (_properties == null || _properties!.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.home_work_rounded,
-        title: 'No properties listed yet',
-        subtitle: 'Properties submitted by landlords will appear here',
-      );
-    }
-
+    final properties = _properties ?? const <Property>[];
     return RefreshIndicator(
       color: AppTheme.secondaryGold,
       onRefresh: _load,
       child: ListView.builder(
         padding: const EdgeInsets.all(12),
-        itemCount: _properties!.length,
+        itemCount: properties.length + 1,
         itemBuilder: (_, i) {
-          final p = _properties![i];
+          if (i == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: SizedBox(width: double.infinity, child: ElevatedButton.icon(
+                onPressed: () async { final changed = await context.push<bool>('/admin/properties/new'); if (changed == true) _load(); },
+                icon: const Icon(Icons.add), label: const Text('Add Property'),
+              )),
+            );
+          }
+          final p = properties[i - 1];
           return Card(
             margin: const EdgeInsets.only(bottom: 10),
             child: Padding(
@@ -503,6 +505,12 @@ class _PropertiesTabState extends State<_PropertiesTab> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      IconButton(
+                        tooltip: 'Edit property',
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                        color: AppTheme.primaryNavy,
+                        onPressed: () async { final changed = await context.push<bool>('/admin/properties/${p.id}/edit'); if (changed == true) _load(); },
+                      ),
                       TextButton.icon(
                         icon: Icon(p.available ? Icons.visibility_off : Icons.visibility, size: 18),
                         label: Text(p.available ? 'Mark Unavailable' : 'Mark Available'),

@@ -15,6 +15,7 @@ import '../screens/landlord_management_screen.dart';
 import '../screens/contact_screen.dart';
 import '../screens/admin_login_screen.dart';
 import '../admin/admin_dashboard.dart';
+import '../admin/admin_edit_property_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -93,6 +94,16 @@ final GoRouter appRouter = GoRouter(
       path: '/admin/login',
       name: 'adminLogin',
       builder: (context, state) => const AdminLoginScreen(),
+    ),
+    GoRoute(
+      path: '/admin/properties/new',
+      name: 'adminAddProperty',
+      builder: (context, state) => const AdminEditPropertyScreen(),
+    ),
+    GoRoute(
+      path: '/admin/properties/:id/edit',
+      name: 'adminEditProperty',
+      builder: (context, state) => AdminEditPropertyScreen(propertyId: state.pathParameters['id']),
     ),
     GoRoute(
       path: '/admin',
