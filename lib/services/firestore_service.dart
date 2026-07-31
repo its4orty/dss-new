@@ -1,5 +1,237 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/property.dart';
+import '../models/tenant.dart';
+import '../models/landlord.dart';
+import '../models/enquiry.dart';
+
 class FirestoreService {
-  final db = FirebaseFirestore.instance;
+  final FirebaseFirestore db;
+
+  FirestoreService({FirebaseFirestore? firestore})
+      : db = firestore ?? FirebaseFirestore.instance;
+
+  // ──────────────────────────────────────────────
+  // Properties
+  // ──────────────────────────────────────────────
+
+  Future<List<Property>> getProperties() async {
+    try {
+      final snapshot = await db.collection('properties').get();
+      return snapshot.docs
+          .map((doc) => Property.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch properties: $e');
+    }
+  }
+
+  Future<List<Property>> getFeaturedProperties({int limit = 6}) async {
+    try {
+      final snapshot = await db
+          .collection('properties')
+          .where('available', isEqualTo: true)
+          .limit(limit)
+          .get();
+      return snapshot.docs
+          .map((doc) => Property.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch featured properties: $e');
+    }
+  }
+
+  Future<List<Property>> searchProperties(String query) async {
+    try {
+      final snapshot = await db
+          .collection('properties')
+          .where('available', isEqualTo: true)
+          .get();
+      final queryLower = query.toLowerCase();
+      return snapshot.docs
+          .map((doc) => Property.fromMap(doc.data(), doc.id))
+          .where((p) =>
+              p.title.toLowerCase().contains(queryLower) ||
+              p.address.toLowerCase().contains(queryLower) ||
+              p.postcode.toLowerCase().contains(queryLower) ||
+              p.description.toLowerCase().contains(queryLower))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to search properties: $e');
+    }
+  }
+
+  Future<Property?> getPropertyById(String id) async {
+    try {
+      final doc = await db.collection('properties').doc(id).get();
+      if (!doc.exists) return null;
+      return Property.fromMap(doc.data()!, doc.id);
+    } catch (e) {
+      throw Exception('Failed to fetch property: $e');
+    }
+  }
+
+  Future<String> createProperty(Property property) async {
+    try {
+      final docRef =
+          await db.collection('properties').add(property.toMap());
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Failed to create property: $e');
+    }
+  }
+
+  Future<void> updateProperty(String id, Property property) async {
+    try {
+      await db.collection('properties').doc(id).update(property.toMap());
+    } catch (e) {
+      throw Exception('Failed to update property: $e');
+    }
+  }
+
+  Future<void> deleteProperty(String id) async {
+    try {
+      await db.collection('properties').doc(id).delete();
+    } catch (e) {
+      throw Exception('Failed to delete property: $e');
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // Tenants
+  // ──────────────────────────────────────────────
+
+  Future<String> registerTenant(Tenant tenant) async {
+    try {
+      final docRef = await db.collection('tenants').add(tenant.toMap());
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Failed to register tenant: $e');
+    }
+  }
+
+  Future<Tenant?> getTenant(String id) async {
+    try {
+      final doc = await db.collection('tenants').doc(id).get();
+      if (!doc.exists) return null;
+      return Tenant.fromMap(doc.data()!, doc.id);
+    } catch (e) {
+      throw Exception('Failed to fetch tenant: $e');
+    }
+  }
+
+  Future<void> updateTenant(String id, Tenant tenant) async {
+    try {
+      await db.collection('tenants').doc(id).update(tenant.toMap());
+    } catch (e) {
+      throw Exception('Failed to update tenant: $e');
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // Landlords
+  // ──────────────────────────────────────────────
+
+  Future<String> registerLandlord(Landlord landlord) async {
+    try {
+      final docRef = await db.collection('landlords').add(landlord.toMap());
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Failed to register landlord: $e');
+    }
+  }
+
+  Future<Landlord?> getLandlord(String id) async {
+    try {
+      final doc = await db.collection('landlords').doc(id).get();
+      if (!doc.exists) return null;
+      return Landlord.fromMap(doc.data()!, doc.id);
+    } catch (e) {
+      throw Exception('Failed to fetch landlord: $e');
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // Enquiries
+  // ──────────────────────────────────────────────
+
+  Future<String> createEnquiry(Enquiry enquiry) async {
+    try {
+      final docRef = await db.collection('enquiries').add(enquiry.toMap());
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Failed to create enquiry: $e');
+    }
+  }
+
+  Future<List<Enquiry>> getEnquiriesForProperty(String propertyId) async {
+    try {
+      final snapshot = await db
+          .collection('enquiries')
+          .where('propertyId', isEqualTo: propertyId)
+          .get();
+      return snapshot.docs
+          .map((doc) => Enquiry.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch property enquiries: $e');
+    }
+  }
+
+  Future<List<Enquiry>> getEnquiriesForTenant(String tenantId) async {
+    try {
+      final snapshot = await db
+          .collection('enquiries')
+          .where('tenantId', isEqualTo: tenantId)
+          .get();
+      return snapshot.docs
+          .map((doc) => Enquiry.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch tenant enquiries: $e');
+    }
+  }
+
+  Future<void> updateEnquiryStatus(String id, String status) async {
+    try {
+      await db.collection('enquiries').doc(id).update({'status': status});
+    } catch (e) {
+      throw Exception('Failed to update enquiry status: $e');
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // Waitlist
+  // ──────────────────────────────────────────────
+
+  Future<void> addToWaitlist(String email) async {
+    try {
+      await db.collection('waitlist').add({
+        'email': email,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Failed to add to waitlist: $e');
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // Admin Analytics
+  // ──────────────────────────────────────────────
+
+  Future<Map<String, int>> getDashboardStats() async {
+    try {
+      final propsSnapshot = await db.collection('properties').get();
+      final tenantsSnapshot = await db.collection('tenants').get();
+      final landlordsSnapshot = await db.collection('landlords').get();
+      final enquiriesSnapshot = await db.collection('enquiries').get();
+      return {
+        'properties': propsSnapshot.docs.length,
+        'tenants': tenantsSnapshot.docs.length,
+        'landlords': landlordsSnapshot.docs.length,
+        'enquiries': enquiriesSnapshot.docs.length,
+      };
+    } catch (e) {
+      throw Exception('Failed to fetch dashboard stats: $e');
+    }
+  }
 }
