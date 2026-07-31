@@ -1,108 +1,468 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
+import '../services/firestore_service.dart';
 
-class ContactScreen extends StatelessWidget {
+class ContactScreen extends StatefulWidget {
   const ContactScreen({super.key});
 
-  Future<void> _launchUrl(String url) async {
+  @override
+  State<ContactScreen> createState() => _ContactScreenState();
+}
+
+class _ContactScreenState extends State<ContactScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+
+  // ── Helpers ──
+
+  Future<void> _launchExternalUrl(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
+
+  Future<void> _launchPhone() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Call DSS Lets?'),
+        content: const Text('This will open your phone dialler to call\n01202 000000.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Call'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      final uri = Uri.parse('tel:+441202000000');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      }
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Contact Form Bottom Sheet
+  // ────────────────────────────────────────────────────────────
+
+  void _showContactForm() {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final messageCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (buildCtx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(buildCtx).viewInsets.bottom + 24,
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Handle
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Send us a Message',
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'We\'ll get back to you within 24 hours',
+                        style: TextStyle(fontSize: 13, color: AppTheme.textMedium),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Name
+                      TextFormField(
+                        controller: nameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Full Name',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? 'Please enter your name' : null,
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Email
+                      TextFormField(
+                        controller: emailCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Email Address',
+                          prefixIcon: Icon(Icons.email_outlined),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Please enter your email';
+                          if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim())) {
+                            return 'Please enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Phone
+                      TextFormField(
+                        controller: phoneCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone Number',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                        ),
+                        keyboardType: TextInputType.phone,
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? 'Please enter your phone number' : null,
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Message
+                      TextFormField(
+                        controller: messageCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Your Message',
+                          prefixIcon: Icon(Icons.message_outlined),
+                          alignLabelWithHint: true,
+                        ),
+                        maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? 'Please enter a message' : null,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Submit
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryNavy,
+                            foregroundColor: AppTheme.accentWhite,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  if (!formKey.currentState!.validate()) return;
+                                  setModalState(() => isSubmitting = true);
+                                  try {
+                                    await _firestoreService.submitContactMessage(
+                                      name: nameCtrl.text.trim(),
+                                      email: emailCtrl.text.trim(),
+                                      phone: phoneCtrl.text.trim(),
+                                      message: messageCtrl.text.trim(),
+                                    );
+                                    if (buildCtx.mounted) Navigator.pop(buildCtx);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Row(
+                                            children: [
+                                              Icon(Icons.check_circle, color: Colors.white),
+                                              SizedBox(width: 10),
+                                              Text('Message sent! We\'ll get back to you soon.'),
+                                            ],
+                                          ),
+                                          backgroundColor: AppTheme.successGreen,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    setModalState(() => isSubmitting = false);
+                                    if (buildCtx.mounted) {
+                                      ScaffoldMessenger.of(buildCtx).showSnackBar(
+                                        SnackBar(
+                                          content: Row(
+                                            children: [
+                                              const Icon(Icons.error_outline, color: Colors.white),
+                                              const SizedBox(width: 10),
+                                              Expanded(child: Text('Failed to send: $e')),
+                                            ],
+                                          ),
+                                          backgroundColor: AppTheme.errorRed,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                          child: isSubmitting
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Send Message', style: TextStyle(fontSize: 16)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Current day helper ──
+
+  bool _isToday(int weekday) {
+    return DateTime.now().weekday == weekday;
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Build
+  // ────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Contact Us'),
-      ),
+      appBar: AppBar(title: const Text('Contact Us')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Get in Touch',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'We\'re here to help. Choose how you\'d like to reach us.',
-              style: TextStyle(fontSize: 14, color: AppTheme.textMedium),
-            ),
-            const SizedBox(height: 24),
-
-            // ── Call ──
-            _ContactTile(
-              icon: Icons.phone,
-              title: 'Call Us',
-              subtitle: '020 1234 5678',
-              color: AppTheme.primaryNavy,
-              onTap: () => _launchUrl('tel:02012345678'),
-            ),
-            const SizedBox(height: 12),
-
-            // ── WhatsApp ──
-            _ContactTile(
-              icon: Icons.chat,
-              title: 'WhatsApp',
-              subtitle: 'Message us on WhatsApp',
-              color: AppTheme.successGreen,
-              onTap: () => _launchUrl('https://wa.me/447000000000'),
-            ),
-            const SizedBox(height: 12),
-
-            // ── Email ──
-            _ContactTile(
-              icon: Icons.email,
-              title: 'Email',
-              subtitle: 'info@dsslets.co.uk',
-              color: const Color(0xFFEA4335),
-              onTap: () => _launchUrl('mailto:info@dsslets.co.uk'),
-            ),
-            const SizedBox(height: 12),
-
-            // ── Contact Form ──
-            _ContactTile(
-              icon: Icons.edit_note,
-              title: 'Contact Form',
-              subtitle: 'Fill out our quick contact form',
-              color: const Color(0xFF6C63FF),
-              onTap: () => _showContactForm(context),
-            ),
-            const SizedBox(height: 32),
-
-            // ── Office Info ──
+            // ── Header ──
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.accentWhite,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+              color: AppTheme.primaryNavy,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Office Hours',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    'Get in Touch',
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                          color: AppTheme.accentWhite,
+                        ),
                   ),
-                  const SizedBox(height: 12),
-                  const _OfficeHourRow(day: 'Mon–Fri', hours: '9:00 AM – 6:00 PM'),
-                  const _OfficeHourRow(day: 'Saturday', hours: '10:00 AM – 4:00 PM'),
-                  const _OfficeHourRow(day: 'Sunday', hours: 'Closed'),
+                  const SizedBox(height: 6),
+                  Text(
+                    "We're here to help you find your next home",
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppTheme.accentWhite.withOpacity(0.85),
+                    ),
+                  ),
                 ],
               ),
             ),
+
+            // ── Action Tiles ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+              child: Column(
+                children: [
+                  // Row 1: Call + WhatsApp
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ActionTile(
+                          icon: Icons.phone_rounded,
+                          title: 'Call Us',
+                          subtitle: '01202 000000',
+                          color: AppTheme.primaryNavy,
+                          onTap: _launchPhone,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ActionTile(
+                          icon: Icons.chat_bubble_rounded,
+                          title: 'WhatsApp',
+                          subtitle: 'Chat with us',
+                          color: const Color(0xFF25D366),
+                          onTap: () => _launchExternalUrl('https://wa.me/447000000000'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Row 2: Email + Form
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ActionTile(
+                          icon: Icons.email_rounded,
+                          title: 'Email Us',
+                          subtitle: 'info@dsslets.co.uk',
+                          color: const Color(0xFFEA4335),
+                          onTap: () => _launchExternalUrl(
+                            'mailto:info@dsslets.co.uk?subject=DSS%20Lets%20Enquiry',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ActionTile(
+                          icon: Icons.edit_note_rounded,
+                          title: 'Contact Form',
+                          subtitle: 'Send us a message',
+                          color: const Color(0xFF6C63FF),
+                          onTap: _showContactForm,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Office Hours ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentWhite,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time_rounded,
+                            color: AppTheme.primaryNavy, size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Office Hours',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _buildOfficeHourRow('Monday – Friday', '9:00 AM – 6:00 PM',
+                        isToday: _isToday(DateTime.monday) ||
+                            _isToday(DateTime.tuesday) ||
+                            _isToday(DateTime.wednesday) ||
+                            _isToday(DateTime.thursday) ||
+                            _isToday(DateTime.friday)),
+                    const Divider(height: 20),
+                    _buildOfficeHourRow('Saturday', '10:00 AM – 4:00 PM',
+                        isToday: _isToday(DateTime.saturday)),
+                    const Divider(height: 20),
+                    _buildOfficeHourRow('Sunday', 'Closed',
+                        isToday: _isToday(DateTime.sunday), isClosed: true),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Address ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentWhite,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_outlined,
+                            color: AppTheme.primaryNavy, size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Our Office',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'DSS Lets\n123 High Street\nBournemouth\nBH1 1AA\nUnited Kingdom',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.textMedium,
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
             const SizedBox(height: 40),
           ],
         ),
@@ -110,107 +470,80 @@ class ContactScreen extends StatelessWidget {
     );
   }
 
-  void _showContactForm(BuildContext context) {
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
-    final messageController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Send us a Message',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    prefixIcon: Icon(Icons.person),
+  Widget _buildOfficeHourRow(String day, String hours,
+      {bool isToday = false, bool isClosed = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              if (isToday) ...[
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.successGreen,
+                    shape: BoxShape.circle,
                   ),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                day,
+                style: TextStyle(
+                  fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 15,
+                  color: isToday ? AppTheme.primaryNavy : AppTheme.textDark,
+                ),
+              ),
+              if (isToday) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondaryGold.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Required';
-                    if (!v.contains('@')) return 'Invalid email';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: messageController,
-                  decoration: const InputDecoration(
-                    labelText: 'Message',
-                    prefixIcon: Icon(Icons.message),
-                    alignLabelWithHint: true,
-                  ),
-                  maxLines: 3,
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (formKey.currentState!.validate()) {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Message sent! (placeholder)'),
-                            backgroundColor: AppTheme.successGreen,
-                          ),
-                        );
-                      }
-                    },
-                    child: const Text('Send Message'),
+                  child: const Text(
+                    'Today',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.secondaryGold,
+                    ),
                   ),
                 ),
               ],
+            ],
+          ),
+          Text(
+            hours,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isClosed ? FontWeight.w600 : FontWeight.w400,
+              color: isClosed ? AppTheme.errorRed : AppTheme.textMedium,
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
 
-class _ContactTile extends StatelessWidget {
+// ────────────────────────────────────────────────────────────────
+// Action Tile Widget
+// ────────────────────────────────────────────────────────────────
+
+class _ActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
 
-  const _ContactTile({
+  const _ActionTile({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -220,44 +553,59 @@ class _ContactTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: color, size: 24),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         onTap: onTap,
-      ),
-    );
-  }
-}
-
-class _OfficeHourRow extends StatelessWidget {
-  final String day;
-  final String hours;
-
-  const _OfficeHourRow({required this.day, required this.hours});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(day, style: const TextStyle(fontWeight: FontWeight.w500)),
-          Text(hours, style: TextStyle(color: AppTheme.textMedium)),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.accentWhite,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.12),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textDark,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textMedium,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
