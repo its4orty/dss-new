@@ -869,7 +869,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.home_off_outlined,
+                Icons.home_outlined,
                 size: 72,
                 color: AppTheme.textMedium.withOpacity(0.5),
               ),

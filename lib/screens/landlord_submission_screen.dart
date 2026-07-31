@@ -65,8 +65,7 @@ class _LandlordSubmissionScreenState extends State<LandlordSubmissionScreen> {
         email: _landlordEmailController.text.trim(),
         propertyCount: 1,
       );
-      final landlordId =
-          await _firestoreService.registerLandlord(landlord);
+      await _firestoreService.registerLandlord(landlord);
 
       // 2. Create the property
       final property = Property(
@@ -336,7 +335,7 @@ class _LandlordSubmissionScreenState extends State<LandlordSubmissionScreen> {
               const SizedBox(height: 14),
 
               DropdownButtonFormField<String>(
-                value: _furnishedStatus,
+                initialValue: _furnishedStatus,
                 decoration: const InputDecoration(
                   labelText: 'Furnished Status',
                   prefixIcon: Icon(Icons.chair),

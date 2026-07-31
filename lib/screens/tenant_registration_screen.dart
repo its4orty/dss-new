@@ -240,7 +240,7 @@ class _TenantRegistrationScreenState extends State<TenantRegistrationScreen> {
 
               // Benefit Type
               DropdownButtonFormField<String>(
-                value: _benefitType,
+                initialValue: _benefitType,
                 decoration: const InputDecoration(
                   labelText: 'Benefit Type',
                   prefixIcon: Icon(Icons.account_balance),
