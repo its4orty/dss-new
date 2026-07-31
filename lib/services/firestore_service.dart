@@ -295,16 +295,30 @@ class FirestoreService {
   // Waitlist
   // ──────────────────────────────────────────────
 
-  Future<void> addToWaitlist(String email) async {
+  /// Adds an email to the waitlist only once (case-insensitive).
+  Future<void> submitToWaitlist(String email) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) throw Exception('Email is required');
     try {
-      await db.collection('waitlist').add({
-        'email': email,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      final existing = await db
+          .collection('waitlist')
+          .where('email', isEqualTo: normalizedEmail)
+          .limit(1)
+          .get();
+      if (existing.docs.isEmpty) {
+        await db.collection('waitlist').add({
+          'email': normalizedEmail,
+          'source': 'app',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
     } catch (e) {
       throw Exception('Failed to add to waitlist: $e');
     }
   }
+
+  // Kept for existing callers.
+  Future<void> addToWaitlist(String email) => submitToWaitlist(email);
 
   // ──────────────────────────────────────────────
   // Admin Analytics
