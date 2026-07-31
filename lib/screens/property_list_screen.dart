@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../models/property.dart';
 import '../services/firestore_service.dart';
@@ -220,35 +220,7 @@ class _PropertyCard extends StatelessWidget {
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(12)),
                   child: hasImage
-                      ? CachedNetworkImage(
-                          imageUrl: property.images.first,
-                          height: 180,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            height: 180,
-                            color: AppTheme.primaryNavy.withOpacity(0.08),
-                            child: const Center(
-                              child: SizedBox(
-                                width: 28,
-                                height: 28,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: AppTheme.primaryNavy,
-                                ),
-                              ),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            height: 180,
-                            color: AppTheme.primaryNavy.withOpacity(0.08),
-                            child: const Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 48,
-                              color: AppTheme.textMedium,
-                            ),
-                          ),
-                        )
+                      ? _PropertyImage(source: property.images.first)
                       : Container(
                           height: 180,
                           color: AppTheme.primaryNavy.withOpacity(0.08),
@@ -582,5 +554,22 @@ class _ShimmerPropertyCardState extends State<_ShimmerPropertyCard>
         );
       },
     );
+  }
+}
+
+
+class _PropertyImage extends StatelessWidget {
+  final String source;
+  const _PropertyImage({required this.source});
+  @override
+  Widget build(BuildContext context) {
+    if (source.startsWith('data:')) {
+      try {
+        return Image.memory(base64Decode(source.substring(source.indexOf(',') + 1)), height: 180, width: double.infinity, fit: BoxFit.cover);
+      } catch (_) {
+        return const SizedBox(height: 180, child: Icon(Icons.image_not_supported_outlined));
+      }
+    }
+    return Image.network(source, height: 180, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppTheme.primaryNavy.withOpacity(0.08), child: const Icon(Icons.image_not_supported_outlined)));
   }
 }
