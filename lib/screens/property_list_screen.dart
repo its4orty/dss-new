@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
 import '../models/property.dart';
 import '../services/firestore_service.dart';
+import '../utils/image_utils.dart';
 
 class PropertyListScreen extends StatefulWidget {
   const PropertyListScreen({super.key});
@@ -199,8 +200,8 @@ class _PropertyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasImage =
-        property.images.isNotEmpty && property.images.first.isNotEmpty;
+    final imagePaths = property.images.where((path) => path.isNotEmpty && !isVideoPath(path)).toList();
+    final hasImage = imagePaths.isNotEmpty;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
@@ -220,7 +221,7 @@ class _PropertyCard extends StatelessWidget {
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(12)),
                   child: hasImage
-                      ? _PropertyImage(source: property.images.first)
+                      ? _PropertyImage(source: imagePaths.first)
                       : Container(
                           height: 180,
                           color: AppTheme.primaryNavy.withOpacity(0.08),
@@ -570,6 +571,6 @@ class _PropertyImage extends StatelessWidget {
         return const SizedBox(height: 180, child: Icon(Icons.image_not_supported_outlined));
       }
     }
-    return Image.network(source, height: 180, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppTheme.primaryNavy.withOpacity(0.08), child: const Icon(Icons.image_not_supported_outlined)));
+    return Image.network(resolvePropertyImageUrl(source), height: 180, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppTheme.primaryNavy.withOpacity(0.08), child: const Icon(Icons.image_not_supported_outlined)));
   }
 }

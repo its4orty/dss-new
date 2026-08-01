@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../models/property.dart';
 import '../services/firestore_service.dart';
+import '../utils/image_utils.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -982,8 +983,8 @@ class _FeaturedPropertyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasImage =
-        property.images.isNotEmpty && property.images.first.isNotEmpty;
+    final imagePaths = property.images.where((path) => path.isNotEmpty && !isVideoPath(path)).toList();
+    final hasImage = imagePaths.isNotEmpty;
 
     return GestureDetector(
       onTap: () => context.go('/properties/${property.id}'),
@@ -1010,7 +1011,7 @@ class _FeaturedPropertyCard extends StatelessWidget {
                   const BorderRadius.vertical(top: Radius.circular(12)),
               child: hasImage
                   ? CachedNetworkImage(
-                      imageUrl: property.images.first,
+                      imageUrl: resolvePropertyImageUrl(imagePaths.first),
                       height: 120,
                       width: double.infinity,
                       fit: BoxFit.cover,

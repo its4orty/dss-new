@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/property.dart';
 import '../services/firestore_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/image_utils.dart';
 
 class AdminEditPropertyScreen extends StatefulWidget {
   final String? propertyId;
@@ -75,13 +76,15 @@ class _AdminEditPropertyScreenState extends State<AdminEditPropertyScreen> {
       decoration: InputDecoration(labelText: label, border: const OutlineInputBorder(), filled: true)));
   Widget _counter(String label, int value, void Function(int) setValue) => Row(children: [Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))), IconButton(onPressed: value > 1 ? () => setValue(value - 1) : null, icon: const Icon(Icons.remove_circle_outline)), Text('$value', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), IconButton(onPressed: () => setValue(value + 1), icon: const Icon(Icons.add_circle_outline))]);
 
-  Widget _photosSection() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    const Text('Photos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-    const SizedBox(height: 8),
-    SizedBox(height: 104, child: _images.isEmpty ? const Center(child: Text('No photos added yet')) : ListView.separated(scrollDirection: Axis.horizontal, itemCount: _images.length, separatorBuilder: (_, __) => const SizedBox(width: 8), itemBuilder: (context, index) => Stack(children: [
-      ClipRRect(borderRadius: BorderRadius.circular(8), child: _imageWidget(_images[index], width: 104, height: 104)),
-      Positioned(right: 2, top: 2, child: InkWell(onTap: () => setState(() => _images.removeAt(index)), child: Container(decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: const Icon(Icons.close, color: Colors.white, size: 20)))),
-    ]))),
+  Widget _photosSection() {
+    final imagePaths = _images.where((path) => !isVideoPath(path)).toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Photos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8),
+      SizedBox(height: 104, child: imagePaths.isEmpty ? const Center(child: Text('No photos added yet')) : ListView.separated(scrollDirection: Axis.horizontal, itemCount: imagePaths.length, separatorBuilder: (_, __) => const SizedBox(width: 8), itemBuilder: (context, index) => Stack(children: [
+        ClipRRect(borderRadius: BorderRadius.circular(8), child: _imageWidget(imagePaths[index], width: 104, height: 104)),
+        Positioned(right: 2, top: 2, child: InkWell(onTap: () => setState(() => _images.remove(imagePaths[index])), child: Container(decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: const Icon(Icons.close, color: Colors.white, size: 20)))),
+      ]))),
     const SizedBox(height: 8),
     OutlinedButton.icon(onPressed: _picking ? null : _pickPhoto, icon: _picking ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add_photo_alternate_outlined), label: const Text('Add Photo')),
     const SizedBox(height: 8),
@@ -90,7 +93,7 @@ class _AdminEditPropertyScreenState extends State<AdminEditPropertyScreen> {
 
   Widget _imageWidget(String source, {required double width, required double height}) {
     if (source.startsWith('data:')) { try { return Image.memory(base64Decode(source.substring(source.indexOf(',') + 1)), width: width, height: height, fit: BoxFit.cover); } catch (_) {} }
-    return Image.network(source, width: width, height: height, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image));
+    return Image.network(resolvePropertyImageUrl(source), width: width, height: height, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image));
   }
 
   @override
