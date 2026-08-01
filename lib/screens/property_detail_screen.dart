@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../models/property.dart';
 import '../services/firestore_service.dart';
+import '../utils/image_utils.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
   final String propertyId;
@@ -139,7 +140,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   // Main Detail Content
   // ═══════════════════════════════════════════════════════════════
   Widget _buildDetailContent(Property property) {
-    final hasImages = property.images.isNotEmpty;
+    final imagePaths = property.images.where((path) => path.isNotEmpty && !isVideoPath(path)).toList();
+    final hasImages = imagePaths.isNotEmpty;
 
     return Scaffold(
       body: CustomScrollView(
@@ -188,12 +190,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                       // ── PageView for images ──
                       PageView.builder(
                         controller: _pageController,
-                        itemCount: property.images.length,
+                        itemCount: imagePaths.length,
                         onPageChanged: (index) {
                           setState(() => _currentImageIndex = index);
                         },
                         itemBuilder: (context, index) {
-                          final image = property.images[index];
+                          final image = imagePaths[index];
                           if (image.startsWith('data:')) {
                             try {
                               return Image.memory(
@@ -206,7 +208,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                             }
                           }
                           return CachedNetworkImage(
-                            imageUrl: image,
+                            imageUrl: resolvePropertyImageUrl(image),
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Container(
                               color: AppTheme.primaryNavy.withOpacity(0.08),
@@ -247,7 +249,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Text(
-                            '${_currentImageIndex + 1} / ${property.images.length}',
+                            '${_currentImageIndex + 1} / ${imagePaths.length}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13,
