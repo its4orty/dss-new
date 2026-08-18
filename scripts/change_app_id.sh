@@ -30,8 +30,19 @@ else
   echo "(no com.example.dss_lets matches — already changed?)"
 fi
 
-# 1. build.gradle — applicationId + namespace
-sed -i '' "s/$OLD/$NEW/g" android/app/build.gradle
+# 1. build.gradle or build.gradle.kts — applicationId + namespace
+#    (newer Flutter templates use the Kotlin DSL file .kts; classic uses .gradle)
+GRADLE_FILE=""
+if [ -f "android/app/build.gradle" ]; then
+  GRADLE_FILE="android/app/build.gradle"
+elif [ -f "android/app/build.gradle.kts" ]; then
+  GRADLE_FILE="android/app/build.gradle.kts"
+else
+  echo "ERROR: no android/app/build.gradle or build.gradle.kts found"
+  exit 1
+fi
+echo "Editing $GRADLE_FILE"
+sed -i '' "s/$OLD/$NEW/g" "$GRADLE_FILE"
 
 # 2. AndroidManifest.xml — package attribute, if present
 MANIFEST="android/app/src/main/AndroidManifest.xml"
@@ -55,7 +66,7 @@ if [ -d "$OLD_PKG_DIR" ]; then
 fi
 
 echo "=== After ==="
-grep -rn "$NEW" android/app/build.gradle "$MANIFEST" 2>/dev/null || true
+grep -rn "$NEW" "$GRADLE_FILE" "$MANIFEST" 2>/dev/null || true
 if [ -f "$NEW_PKG_DIR/MainActivity.kt" ]; then
   grep -n "^package" "$NEW_PKG_DIR/MainActivity.kt"
 fi
