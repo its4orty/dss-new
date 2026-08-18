@@ -91,6 +91,8 @@ class _AdminEditPropertyScreenState extends State<AdminEditPropertyScreen> {
     Row(children: [Expanded(child: TextField(controller: _imageUrl, decoration: const InputDecoration(labelText: 'Or paste image URL', border: OutlineInputBorder(), filled: true), keyboardType: TextInputType.url)), const SizedBox(width: 8), IconButton(icon: const Icon(Icons.add_circle, color: AppTheme.primaryNavy, size: 32), onPressed: () { final u = _imageUrl.text.trim(); if (u.isNotEmpty) { setState(() => _images.add(u)); _imageUrl.clear(); } })]),
   ]);
 
+  }
+
   Widget _imageWidget(String source, {required double width, required double height}) {
     if (source.startsWith('data:')) { try { return Image.memory(base64Decode(source.substring(source.indexOf(',') + 1)), width: width, height: height, fit: BoxFit.cover); } catch (_) {} }
     return Image.network(resolvePropertyImageUrl(source), width: width, height: height, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image));
